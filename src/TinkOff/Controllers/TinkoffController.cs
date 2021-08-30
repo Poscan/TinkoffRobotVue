@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -17,6 +18,7 @@ namespace TinkOff.Controllers
         public TinkoffController()
         {
             var connection = ConnectionFactory.GetConnection(TinkOff.Properties.TinkoffTokken.Tokken);
+
             _context = connection.Context;
         }
 
@@ -24,7 +26,6 @@ namespace TinkOff.Controllers
         public async Task<Portfolio> Get()
         {
             return await _context.PortfolioAsync();
-            ;
         }
 
         [HttpGet("Stock")]
@@ -35,12 +36,41 @@ namespace TinkOff.Controllers
                 .Select(position => new Stock
                 {
                     AveragePositionPrice = position.AveragePositionPrice.Value,
-                    ExpectedYield = position.ExpectedYield.Value,
+                    CurrentPrice = _context.MarketOrderbookAsync(position.Figi, 0).Result.LastPrice,
                     Lots = position.Lots,
-                    Name = position.Name
+                    Name = position.Name,
+                    PercentagesPerDay = Decimal.Round(_context
+                        .MarketCandlesAsync(position.Figi, DateTime.Today, DateTime.Now, CandleInterval.Day).Result
+                        .Candles.Select(x => x.Close * 100 / x.Open).First() - 100, 2)
                 });
 
             return currentPortfolioStocks;
+        }
+
+        [HttpGet("StockPerDay")]
+        public async Task<IEnumerable<Stock>> GetStockPerDay()
+        {
+            var currentPortfolioStocks = (await _context.PortfolioAsync()).Positions
+                .Where(position => position.InstrumentType == InstrumentType.Stock)
+                .Select(position => new Stock
+                {
+                    AveragePositionPrice = position.AveragePositionPrice.Value,
+                    CurrentPrice = _context.MarketOrderbookAsync(position.Figi, 0).Result.LastPrice,
+                    Lots = position.Lots,
+                    Name = position.Name,
+                });
+
+            return currentPortfolioStocks;
+        }
+
+        [HttpGet("Currencies")]
+        public async Task<IEnumerable<Currencies>> GetCurrencies()
+        {
+            return (await _context.PortfolioCurrenciesAsync()).Currencies.Select(currency => new Currencies
+            {
+                Balance = currency.Balance,
+                Currency = (int) currency.Currency
+            });
         }
     }
 }
