@@ -30,7 +30,7 @@ npm run build
 
 ### Lints and fixes files
 ```
-Чиста кода
+Чистка кода
 npm run lint
 ```
 
